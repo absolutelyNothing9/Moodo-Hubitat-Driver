@@ -1,284 +1,330 @@
-/**
- *  Moodo 3
- *
- *  Copyright 2020 andyjkr
- *
- *  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
- *  in compliance with the License. You may obtain a copy of the License at:
+/*
+ *  Licensed under the Apache License, Version 2.0 (the "License"); you may not
+ *  use this file except in compliance with the License. You may obtain a copy
+ *  of the License at:
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software distributed under the License is distributed
- *  on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License
- *  for the specific language governing permissions and limitations under the License.
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+ *  WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+ *  License for the specific language governing permissions and limitations
+ *  under the License.
  */
- preferences {
-	input("username", "text", title: "username", description: "username")
-	input("password", "password", title: "password", description: "password")
-    input("token", "token", title: "token", description: "50 character string")
-    input("device_key", "key", title: "device key", description: "50 character string")
-    }
-    
-metadata {
-	definition (name: "Moodo 3", namespace: "andyjkr", author: "andyjkr", cstHandler: true) {
-		capability "Audio Track Data"
-		capability "Fan Oscillation Mode"
-		capability "Fan Speed"
-		capability "Switch"
-		capability "Switch Level"
-        
-        
-        attribute "name", "string"
-        attribute "box_status", "number"
-        attribute "fan_volume", "number"
-        attribute "interval", "boolean"
-        attribute "interval_type", "number"
-        attribute  "shuffle", "boolean"
-        attribute "color", "string"
-        attribute "title", "string"
-        
-        
-        command "shuffle"
-        command "refresh"
-        command "interval"
-        command "getBoxes"
-	    	command "setSlot0Level"
-        command "setSlot1Level"
-        command "SetSlot2Level"
-        command "setSlot3Level"
-        command "capsule0On"
-        command "capsule1On" 
-        command "capsule2On"
-        command "capsule3On"
-        command "capsule0Off"
-        command "capsule1Off"
-        command "capsule2Off"
-        command "capsule3Off"
-	}
 
-/*THIS SECTION IS THE APPEARANCE*/
+preferences {
+        input "token", "text", title: "Token", required: true
+        input "device_key", "string", title: "Device Key", required: true
+        input "name", "text", title: "Device Name", required: true
+		}
+
+metadata {
+	definition (name: "Moodo Box ", namespace: "ajkr", author: "Andy Kroll") {
+        capability "Switch"
+        capability "Battery"
+        capability "Refresh"
+        capability "Polling"
+        capability "Health Check"
+        capability "Switch Level"
+
+        
+
+        command "shuffleOn"
+        command "shuffleOff"
+        command "intervalOn"
+        command "intervalOff"
+        command "setLevel0", ["number"]   
+        command "setLevel1", ["number"]  
+        command "setLevel2", ["number"]  
+        command "setLevel3", ["number"]  
+        
+        
+        attribute "Fan Speed", "integer"
+        attribute "Interval", "boolean"
+        attribute "Shuffle", "string"
+
+
+        attribute "Slot 0 Speed", "number"
+        attribute "Slot0", "string"
+        attribute "Slot 0 Color", "string"
+        attribute "Slot 0 BG", "string"
+        
+        attribute "Slot 1 Speed", "integer"
+        attribute "Slot 1 Scent", "string"
+        attribute "Slot 1 Color", "string"
+        attribute "Slot 1 BG", "string"
+        
+        attribute "Slot 2 Speed", "integer"
+        attribute "Slot 2 Scent", "string"
+        attribute "Slot 2 Color", "string"
+        attribute "Slot 2 BG", "string"
+        
+        attribute "Slot 3 Speed", "integer"
+        attribute "Slot 3 Scent", "string"
+        attribute "Slot 3 Color", "string"   
+        attribute "Slot 3 BG", "string"
+        
+
+	}
 
 	simulator {
-		// TODO: define status and reply messages here
-	}
-	tiles(scale: 2) {
-    	multiAttributeTile(name:"moodoDevice", type: "generic", width: 6, height: 4){
-			tileAttribute ("device.switch", key: "PRIMARY_CONTROL") {
-				attributeState "on", label:'${name}', action:"switch.off", icon:"st.Appliances.appliances11", backgroundColor:"#00a0dc", nextState:"turningOff"
-				attributeState "off", label:'${name}', action:"switch.on", icon:"st.Appliances.appliances11", backgroundColor:"#cccccc", nextState:"turningOn"
-				attributeState "turningOn", label:'${name}', action:"switch.off", icon:"st.Appliances.appliances11", backgroundColor:"#95d5f5", nextState:"turningOff"
-				attributeState "turningOff", label:'${name}', action:"switch.on", icon:"st.Appliances.appliances11", backgroundColor:"#95d5f5", nextState:"turningOn"
-            }
-   			tileAttribute("fan_volume", key: "SECONDARY_CONTROL") {
-    			attributeState "fan_volume", label:'${currentValue}'
-			}
-        } 
-        // End multiAttributeTile
-        controlTile ("fan_volume", "device.wUI", "slider", height: 4, width: 2, range:"(0..100)", inactiveLabel: false){
-    		state "level", label: '${currentValue}%', action: "switch level.setLevel"
-		}
-		valueTile("slot0", "device.level", width: 3, height: 3){
-            state "on", label:'On', icon:"https://moodo.co/wp-content/uploads/2018/02/orange-sunrise-400x400.jpg", backgroundColor:"#ffb83c", canChangeIcon: false, inactiveLabel: false, canChangeBackground: true, decoration: "flat", action: "switch level.setLevel"
-         }
-       valueTile("slot1", "device.level", width: 3, height: 3){
-            state "on", label:'', icon:"https://moodo.co/wp-content/uploads/2018/02/precious-spices-400x400.jpg", backgroundColor:"#a23035", defaultState: true, decoration: "flat", action: "switch level.setLevel"
-         
-        }
-		valueTile("slot2", "device.level", width: 3, height: 3){
-            state "on", label:"",  decoration: "flat", icon:"https://moodo.co/wp-content/uploads/2018/02/sea-breeze-400x400.jpg",  backgroundColor:"#73b4a3", defaultState: true, action: "switch level.setLevel"
+		status "on": "box_status: 1"
+		status "off": "box_status: 0"
+		status "occupied": "occupancy: 1"
+		status "unoccupied": "occupancy: 0"
 
-        }
-		valueTile("slot3", "device.level", width: 3, height: 3){
-            state "on", label:"", icon:"https://moodo.co/wp-content/uploads/2018/02/sweet-sand-400x400.jpg", backgroundColor: "#c9aa82", defaultState: true, action: "switch level.setLevel"
-}
-        standardTile("mainSwitch", "device.switchRed", height: 1, width: 1, inactiveLabel: false, canChangeIcon: false) {
-            state "off", label:"R", action:"onRed", icon:"st.illuminance.illuminance.dark", backgroundColor:"#D8D8D8"
-            state "on", label:"R", action:"offRed", icon:"st.illuminance.illuminance.bright", backgroundColor:"#FF0000"
-        }
 
-  		controlTile("mainLevelSlider", "device.mainLevel", "slider", range:"(0..100)", height: 1, width: 4, inactiveLabel: false) {
-            state "mainLevel", action:"setMainLevel"
-        }
-        valueTile("mainSwitchLevel", "device.levelRed", decoration: "flat", height: 1, width: 1) {
-            state "levelRed", label:'77%'
-        }
-
-        valueTile("interval", "device.swith", width: 2, height: 2) {
-            state "on", label: 'Interval On', icon:"https://icons-for-free.com/iconfiles/png/512/shuffle+icon-1320196060924471100.png", action:"switch.off", backgroundColor:"#1CB92C", decoration: "flat",  defaultState: true 
-       
-        }
-
-            standardTile("refresh", "", width: 2, height: 2, decoration: "flat") {
-            state "default", label: "", action: "getBoxes", icon: "st.secondary.refresh"
-        }
-	main "moodoDevice"
-	details([ "slot0", "slot1",  "slot2", "slot3", "mainSwitch", "mainLevelSlider", "mainSwitchLevel", "refresh", "favorite", "interval", "moodoDevice"])
-    }
-}
-
-/*END APPEARANCE SECTION*/
-	tiles {
-		// TODO: define your main and details tiles here
 	}
 
 
-// parse events into attributes
-
-def parse(String message) {
-    def msg = stringToMap(message)
-
-    if (!msg.containsKey("headers")) {
-        log.error "No HTTP headers found in '${message}'"
-        return null
-    }
-
-    // parse HTTP response headers
-    def headers = new String(msg.headers.decodeBase64())
-    def parsedHeaders = parseHttpHeaders(headers)
-    log.debug "parsedHeaders: ${parsedHeaders}"
-    if (parsedHeaders.status != 200) {
-        log.error "Return Code: ${parsedHeaders.status} Server error: ${parsedHeaders.reason}"
-        return null
-    }
-
-    // parse HTTP response body
-    if (!msg.body) {
-        log.error "No HTTP body found in '${message}'"
-        return null
-    } else {
-	def body = new String(msg.body.decodeBase64())
-	parseHttpResponse(body)
-	log.debug "body: ${body}"
-	}
 }
 
-private parseHttpHeaders(String headers) {
-    def lines = headers.readLines()
-    def status = lines.remove(0).split()
 
-    def result = [
-        protocol:   status[0],
-        status:     status[1].toInteger(),
-        reason:     status[2]
-    ]
 
-    return result
+
+
+
+def myCallbackMethod(response, data) {
+    if(data["dataitem1"] == "datavalue1")
+        log.debug "status of post call is: ${response.status}"
+
 }
 
-private def parseHttpResponse(String data) {
-    log.debug("parseHttpResponse(${data})")
-	def splitresponse = data.split("=")
-    def port = splitresponse[0]
-	def status = splitresponse[1]
-	if (status == "active"){
-		createEvent(name: "switch", value: "open", descriptionText: "$device.displayName is open", isStateChange: "true")
-	} else if (status == "inactive"){
-		createEvent(name: "switch", value: "close", descriptionText: "$device.displayName is closed", isStateChange: "true")
-	}
-    return status
-}
-// handle commands
-def setFanOscillationMode() {
-	log.debug "Executing 'setFanOscillationMode'"
-	// TODO: handle 'setFanOscillationMode' command
-}
 
-def setFanSpeed() {
-	log.debug "Executing 'setFanSpeed'"
-	// TODO: handle 'setFanSpeed' command
-}
 
-def on() {
-	log.debug "Executing 'on'"
-    sendEvent(name: "switch", value: "on")
 
-        def params = [
-		host:  'rest.moodo.co',
-        path: '/api/boxes/${key}',
-        contentType: 'application/json',
-        headers: [token : "${token}"],
 
-    ]
-    try {
-        httpPost(params)
 
-        
- 
-    } catch (e) {
-        log.error "error: $e"
-    }
-}
+
+
 
 def off() {
-	log.debug "Executing 'off'"
+ def postParams = [
+     uri: "https://rest.moodo.co/api/boxes/${device_key}",
+		    requestContentType: 'application/json',
+		    contentType: 'application/json',
+			headers: ['token': "${token}"]
+			]
+     sendEvent(name:"Switch", value: off, displayed: true)
 
-    sendEvent(name: "switch", value: "off")
+     log.debug"${name} Moodo Turned Off"
+	 asynchttpDelete('myCallbackMethod', postParams, [dataitem1: "datavalue1"])
+callAPI()
+}
 
-        def params = [
-		uri:  'https://rest.moodo.co/api/15978',
-        contentType: 'application/json',
-        headers: [token : "${token}"]
- 
-    ]
-    try {
-        httpDelete(params) {resp ->
-            log.debug "resp data: ${resp.data}"
-            log.debug "status: ${status}"
+
+
+def on() {
+ def postParams = [
+     uri: "https://rest.moodo.co/api/boxes/${device_key}",
+		    requestContentType: 'application/json',
+		    contentType: 'application/json',
+			headers: ['token': "${token}"]
+			]
+     sendEvent(name:"Switch", value: on, displayed: true)
+     log.debug"${name} Moodo Turned On"
+	 asynchttpPost('myCallbackMethod', postParams, [dataitem1: "datavalue1"])
+}
+
+
+
+def intervalOn() {
+ def postParams = [
+     uri: "https://rest.moodo.co/api/interval/${device_key}",
+		    requestContentType: 'application/json',
+		    contentType: 'application/json',
+			headers: ['token': "${token}"]
+			]
+     sendEvent(name:"Interval", value: "On", displayed: true)
+     log.debug"${name} Moodo Interval is On"
+	 asynchttpPost('myCallbackMethod', postParams, [dataitem1: "datavalue1"])
+}
+
+def intervalOff() {
+ def postParams = [
+     uri: "https://rest.moodo.co/api/interval/${device_key}",
+		    requestContentType: 'application/json',
+		    contentType: 'application/json',
+			headers: ['token': "${token}"]
+			]
+     sendEvent(name:"Interval", value: "Off", displayed: true)
+     log.debug"${name} Moodo Interval is Off"
+	 asynchttpDelete('myCallbackMethod', postParams, [dataitem1: "datavalue1"])
+}
+
+def shuffle() {
+    if (shuffle.equals("Off")) {
+        shuffleOn()
+        sendEvent(name:"shuffle", value: true, displayed: true)
+        asynchttpPost('myCallbackMethod', postParams, [dataitem1: "datavalue1"])
         }
-    } catch (e) {
-        log.error "error: $e"
-    }
-}
-
-
-def getBoxes()  {
-	log.debug "Executing 'off'"
-    log.info("${result}")
-    sendEvent(name: "switch", value: "off")
-
-	// TODO: handle 'off' command
-    def token = "${token}"
-    def device_key = "${deviceKey}"
-    def headers = [:]
-	headers.put("HOST","rest.moodo.co/api")
-	headers.put("token", {settings.token})
-    def body = [token
-
-]
-}
-  
-def setLevel() {
-	log.debug "Executing 'setLevel'"
-       sendEvent(name: "fan_volume", value: newval, isStateChange: true, displayed: false)
-       sendEvent(name: "level", value: newval, isStateChange: true, displayed: true)
-    
-	// TODO: handle 'setLevel' command
-    def params = [
-    uri: "https://rest.moodo.co/api/boxes",
-    headers: "token: e6QSLn7mA1tGHCXyFJWs0P5vRBqN93OUrIkcaoDE1582846710",
-    body: [
-  "device_key": 1570,
-  "fan_volume": '${currentValue}%',
-  "duration_minutes": 0,
-  "favorite_id": "string"
-]
-]
-
-try {
-    httpGet(params) { resp ->
-        resp.headers.each {
-            log.debug "${it.name} : ${it.value}"
+    if (shuffle.equals("On")) {
+        shuffleOff()
+        sendEvent(name:"shuffle", value: false, displayed: true)
+        asynchttpDelete('myCallbackMethod', postParams, [dataitem1: "datavalue1"])
         }
-        log.debug "response contentType: ${resp.contentType}"
-        log.debug "response data: ${resp.data}"
-    }
-} catch (e) {
-    log.error "something went wrong: $e"
+    if (shuffle.equals("null")) {
+        shuffleOff()
+        sendEvent(name:"shuffle", value: false, displayed: true)
+        asynchttpDelete('myCallbackMethod', postParams, [dataitem1: "datavalue1"])
+        }
+
+
 }
-    sendEvent(name: "level", value: "newval")
+def setLevel(value) {
+
+	def level = Math.max(Math.min(value as Integer, 99), 0)
+    if (level > 0) {
+		sendEvent(name: "switch", value: "on")
+	} 
+    else {
+		sendEvent(name: "switch", value: "off")
+	}
+	sendEvent(name: "Fan Speed", value: level, unit: "%")
+
+    def postParams = [
+            uri: "https://rest.moodo.co/api/intensity/${device_key}",
+		    requestContentType: 'application/json',
+		    contentType: 'application/json',
+			headers: ['token': "${token}"],
+            body: [
+                      "fan_volume": level,
+                      "restful_request_id": "string"
+                    
+             ],
+			        ]
+
+	asynchttpPost('myCallbackMethod', postParams, [dataitem1: "datavalue1"])
+}
+def setLevel0(value) {
+
+	def level0 = Math.max(Math.min(value as Integer, 99), 0)
+
+	sendEvent(name: "Slot 0 Speed", value: level0, unit: "%")
+
+    def postParams = [
+            uri: "https://rest.moodo.co/api/boxes",
+		    requestContentType: 'application/json',
+		    contentType: 'application/json',
+			headers: ['token': "${token}"],
+            body: [
+               "device_key": "${device_key}",
+                  "settings_slot0": [
+                        "fan_speed": level0,
+                        "fan_active": true
+                      ],
+                      "restful_request_id": "string"
+                    
+                 ],
+			        ]
+
+	asynchttpPut('myCallbackMethod', postParams, [dataitem1: "datavalue1"])
+}
+def setLevel1(value) {
+
+	def level1 = Math.max(Math.min(value as Integer, 99), 0)
+
+	sendEvent(name: "Slot 1 Speed", value: level1, unit: "%")
+
+    def postParams = [
+            uri: "https://rest.moodo.co/api/boxes",
+		    requestContentType: 'application/json',
+		    contentType: 'application/json',
+			headers: ['token': "${token}"],
+            body: [
+               "device_key": "${device_key}",
+                "box_status": 1,
+                "settings_slot0": [
+                        "fan_speed": level0,
+                        "fan_active": true
+                      ], 
+                "settings_slot1": [
+                        "fan_speed": level1,
+                        "fan_active": true
+                 ],
+                "settings_slot2": [
+                        "fan_speed": level2,
+                        "fan_active": true
+                      ],
+                "settings_slot3": [
+                        "fan_speed": level3,
+                        "fan_active": true
+                      ],
+                      "restful_request_id": "string"
+                    
+                 ],
+			        ]
+
+	asynchttpPut('myCallbackMethod', postParams, [dataitem1: "datavalue1"])
+}
+def setLevel2(value) {
+
+	def level2 = Math.max(Math.min(value as Integer, 99), 0)
+
+	sendEvent(name: "Slot 2 Speed", value: level2, unit: "%")
+
+    def postParams = [
+            uri: "https://rest.moodo.co/api/boxes",
+		    requestContentType: 'application/json',
+		    contentType: 'application/json',
+			headers: ['token': "${token}"],
+            body: [
+               "device_key": "${device_key}",
+                "settings_slot2": [
+                        "fan_speed": level2,
+                        "fan_active": true
+                ],
+                      "restful_request_id": "string"
+                    
+                 ],
+			        ]
+
+	asynchttpPut('myCallbackMethod', postParams, [dataitem1: "datavalue1"])
+}
+def setLevel3(value) {
+
+	def level3 = Math.max(Math.min(value as Integer, 99), 0)
+
+	sendEvent(name: "Slot 3 Speed", value: level3, unit: "%")
+
+    def postParams = [
+            uri: "https://rest.moodo.co/api/boxes",
+		    requestContentType: 'application/json',
+		    contentType: 'application/json',
+			headers: ['token': "${token}"],
+            body: [
+               "device_key": "${device_key}",
+                "settings_slot3": [
+                        "fan_speed": level3,
+                        "fan_active": true
+                ],
+                      "restful_request_id": "string"
+                    
+                 ],
+			        ]
+
+	asynchttpPut('myCallbackMethod', postParams, [dataitem1: "datavalue1"])
+}
+def shuffleOn() {
+ def postParams = [
+     uri: "https://rest.moodo.co/api/shuffle/${device_key}",
+		    requestContentType: 'application/json',
+		    contentType: 'application/json',
+			headers: ['token': "${token}"]
+			]
+     log.debug"${name} Shuffle is On"
+     sendEvent(name:"Shuffle", value: "On", displayed: true)
+	 asynchttpPost('myCallbackMethod', postParams, [dataitem1: "datavalue1"])
 }
 
-def poll() {
-	log.debug "Executing poll Command"
-	refresh()
+def shuffleOff() {
+ def postParams = [
+     uri: "https://rest.moodo.co/api/shuffle/${device_key}",
+		    requestContentType: 'application/json',
+		    contentType: 'application/json',
+			headers: ['token': "${token}"]
+			]
+     log.debug"${name} Shuffle is Off"
+     sendEvent(name:"Shuffle", value: "Off", displayed: true)
+	 asynchttpDelete('myCallbackMethod', postParams, [dataitem1: "datavalue1"])
 }
