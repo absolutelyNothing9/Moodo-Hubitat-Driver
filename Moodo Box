@@ -19,7 +19,7 @@ preferences {
 		}
 
 metadata {
-	definition (name: "Moodo Box ", namespace: "ajkr", author: "Andy Kroll") {
+	definition (name: "Moodo Box", namespace: "ajkr", author: "Andy Kroll") {
         capability "Switch"
         capability "Battery"
         capability "Refresh"
@@ -91,6 +91,12 @@ def myCallbackMethod(response, data) {
 }
 
 
+def offDelete(response, data) {
+    if(data["dataitem1"] == "datavalue1")
+        log.debug "status of post call is: ${response.status}"
+
+}
+
 
 
 
@@ -107,9 +113,9 @@ def off() {
 			]
      sendEvent(name:"Switch", value: off, displayed: true)
 
-     log.debug"${name} Moodo Turned Off"
+     log.debug"$device Turned Off"
 	 asynchttpDelete('myCallbackMethod', postParams, [dataitem1: "datavalue1"])
-callAPI()
+
 }
 
 
@@ -122,7 +128,7 @@ def on() {
 			headers: ['token': "${token}"]
 			]
      sendEvent(name:"Switch", value: on, displayed: true)
-     log.debug"${name} Moodo Turned On"
+     log.debug"$device Turned On"
 	 asynchttpPost('myCallbackMethod', postParams, [dataitem1: "datavalue1"])
 }
 
@@ -136,7 +142,7 @@ def intervalOn() {
 			headers: ['token': "${token}"]
 			]
      sendEvent(name:"Interval", value: "On", displayed: true)
-     log.debug"${name} Moodo Interval is On"
+     log.debug"$device Interval is On"
 	 asynchttpPost('myCallbackMethod', postParams, [dataitem1: "datavalue1"])
 }
 
@@ -148,7 +154,7 @@ def intervalOff() {
 			headers: ['token': "${token}"]
 			]
      sendEvent(name:"Interval", value: "Off", displayed: true)
-     log.debug"${name} Moodo Interval is Off"
+     log.debug"$device Interval is Off"
 	 asynchttpDelete('myCallbackMethod', postParams, [dataitem1: "datavalue1"])
 }
 
