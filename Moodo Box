@@ -44,25 +44,25 @@ metadata {
         attribute "Shuffle", "string"
 
 
-        attribute "Slot 0 Speed", "number"
-        attribute "Slot0", "string"
-        attribute "Slot 0 Color", "string"
-        attribute "Slot 0 BG", "string"
+ 	attribute "Slot0_Speed", "number"
+        attribute "Slot0_Scent", "string"
+        attribute "Slot0_Color", "string"
+        attribute "Slot0_BG", "string"
         
-        attribute "Slot 1 Speed", "integer"
-        attribute "Slot 1 Scent", "string"
-        attribute "Slot 1 Color", "string"
-        attribute "Slot 1 BG", "string"
+        attribute "Slot1_Speed", "integer"
+        attribute "Slot1_Scent", "string"
+        attribute "Slot1_Color", "string"
+        attribute "Slot1_BG", "string"
         
-        attribute "Slot 2 Speed", "integer"
-        attribute "Slot 2 Scent", "string"
-        attribute "Slot 2 Color", "string"
-        attribute "Slot 2 BG", "string"
+        attribute "Slot2_Speed", "integer"
+        attribute "Slot2_Scent", "string"
+        attribute "Slot2_Color", "string"
+        attribute "Slot2_BG", "string"
         
-        attribute "Slot 3 Speed", "integer"
-        attribute "Slot 3 Scent", "string"
-        attribute "Slot 3 Color", "string"   
-        attribute "Slot 3 BG", "string"
+        attribute "Slot3_Speed", "integer"
+        attribute "Slot3_Scent", "string"
+        attribute "Slot3_Color", "string"   
+        attribute "Slot3_BG", "string"
         
 
 	}
@@ -87,7 +87,47 @@ metadata {
 def myCallbackMethod(response, data) {
     if(data["dataitem1"] == "datavalue1")
         log.debug "status of post call is: ${response.status}"
+    def intervalValue = "${response.json.box.interval == true ? "On" : "Off"}"
+           sendEvent(name: "Interval", value: intervalValue)
+    def shuffleValue = "${response.json.box.shuffle == true ? "On" : "Off"}"
+           sendEvent(name: "Shuffle", value: shuffleValue)
+    def powerValue = "${response.json.box.box_status == 1 ? "On" : "Off"}"
+           sendEvent(name: "Switch", value: powerValue)
+    def levelValue = "${response.json.box.fan_volume}"
+           sendEvent(name: "Level", value: levelValue)
+    def onlineValue = "${response.json.box.is_online}"
+           sendEvent(name: "Online", value: onlineValue)
+    
+    def slot0Speed = "${response.json.box.settings.getAt(0).fan_speed}"
+           sendEvent(name: "Slot0_Speed", value: slot0Speed)
+    def slot0Name = "${response.json.box.settings.getAt(0).capsule_info.title}"
+           sendEvent(name: "Slot0_Scent", value: slot0Name)
+    def slot0Color = "${response.json.box.settings.getAt(0).capsule_info.color}"
+           sendEvent(name: "Slot0_Color", value: slot0Color)
+    
+    def slot1Speed = "${response.json.box.settings.getAt(1).fan_speed}"
+           sendEvent(name: "Slot1_Speed", value: slot1Speed)
+    def slot1Name = "${response.json.box.settings.getAt(1).capsule_info.title}"
+           sendEvent(name: "Slot1_Scent", value: slot1Name)
+    def slot1Color = "${response.json.box.settings.getAt(2).capsule_info.color}"
+           sendEvent(name: "Slot1_Color", value: slot1Color)
+    
+    def slot2Speed = "${response.json.box.settings.getAt(2).fan_speed}"
+           sendEvent(name: "Slot2_Speed", value: slot2Speed)
+    def slot2Name = "${response.json.box.settings.getAt(2).capsule_info.title}"
+           sendEvent(name: "Slot2_Scent", value: slot2Name)
+    def slot2Color = "${response.json.box.settings.getAt(2).capsule_info.color}"
+           sendEvent(name: "Slot2_Color", value: slot2Color)
+    
+    def slot3Speed = "${response.json.box.settings.getAt(3).fan_speed}"
+       sendEvent(name: "Slot3_Speed", value: slot3Speed)
+    def slot3Name = "${response.json.box.settings.getAt(3).capsule_info.title}"
+       sendEvent(name: "Slot3_Scent", value: slot3Name)
+    def slot3Color = "${response.json.box.settings.getAt(3).capsule_info.color}"
+        sendEvent(name: "Slot3_Color", value: slot3Color)
 
+
+}
 }
 
 
