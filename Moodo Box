@@ -12,14 +12,18 @@
  *  under the License.
  */
 
+import groovy.json.JsonSlurper
+
+
 preferences {
-        input "token", "text", title: "Token", required: true
-        input "device_key", "string", title: "Device Key", required: true
-        input "name", "text", title: "Device Name", required: true
+        input "username", "string", title: "User Name", required: true
+        input "password", "string", title: "Password", required: true
+        input "token", "text", title: "Token", required: false
+        input "device_key", "string", title: "Device Key", required: false
 		}
 
 metadata {
-	definition (name: "Moodo Box", namespace: "ajkr", author: "Andy Kroll") {
+	definition (name: "Moodo Box", namespace: "absolutelyNothing", author: "absolutelyNothing") {
         capability "Switch"
         capability "Battery"
         capability "Refresh"
@@ -27,24 +31,53 @@ metadata {
         capability "Health Check"
         capability "Switch Level"
 
-        
+        command "applyFavorite"
+        command "createFavorite"
+        command "updateFavorite"
+        	command(
+             "setShuffle", 
+             [
+                [
+                     "name":"Shuffle*",
+                     "description":"Enable or disable shuffle mode",
+                     "type":"ENUM",
+                     "constraints":["on","off"]
+                ]
+             ]
+        )
 
+	command(
+             "setInterval", 
+             [
+                [
+                     "name":"Interval*",
+                     "description":"Enable or disable interval mode",
+                     "type":"ENUM",
+                     "constraints":["on","off"]
+                ]
+             ]
+        )
+      
         command "shuffleOn"
         command "shuffleOff"
+        command "shuffle"
         command "intervalOn"
         command "intervalOff"
-        command "setLevel0", ["number"]   
-        command "setLevel1", ["number"]  
-        command "setLevel2", ["number"]  
-        command "setLevel3", ["number"]  
+        command "setLevel0", ["level"]   
+        command "setLevel1", ["level"]  
+        command "setLevel2", ["level"]  
+        command "setLevel3", ["level"]  
+        command "signIn"
         
         
-        attribute "Fan Speed", "integer"
+        attribute "level", "integer"
         attribute "Interval", "boolean"
         attribute "Shuffle", "string"
+        attribute "Online", "boolean"
+        attribute "Switch", "boolean"
 
 
- 	attribute "Slot0_Speed", "number"
+        attribute "Slot0_Speed", "integer"
         attribute "Slot0_Scent", "string"
         attribute "Slot0_Color", "string"
         attribute "Slot0_BG", "string"
@@ -67,14 +100,7 @@ metadata {
 
 	}
 
-	simulator {
-		status "on": "box_status: 1"
-		status "off": "box_status: 0"
-		status "occupied": "occupancy: 1"
-		status "unoccupied": "occupancy: 0"
 
-
-	}
 
 
 }
@@ -84,9 +110,148 @@ metadata {
 
 
 
-def myCallbackMethod(response, data) {
-    if(data["dataitem1"] == "datavalue1")
-        log.debug "status of post call is: ${response.status}"
+
+
+
+
+def levelCalla(response, data) {
+    log.info "$device status ${response.status}"
+    log.info "$device error ${response.error}"
+    log.info "$device error ${response.data}"
+
+
+}
+
+
+
+
+
+def shuffle() {
+     def postParams = [
+     uri: "https://rest.moodo.co/api/shuffle/${device_key}",
+		    requestContentType: 'application/json',
+		    contentType: 'application/json',
+			headers: ['token': "${token}"]
+			]
+    if (shuffle.equals("Off")) {
+        shuffleOn()
+        sendEvent(name:"shuffle", value: true, displayed: true)
+        asynchttpPost('onOffCall', postParams, [dataitem1: "datavalue1"])
+        }
+    if (shuffle.equals("On")) {
+        shuffleOff()
+        sendEvent(name:"shuffle", value: false, displayed: true)
+        asynchttpDelete('onOffCall', postParams, [dataitem1: "datavalue1"])
+        }
+    if (shuffle.equals("null")) {
+        shuffleOff()
+        sendEvent(name:"shuffle", value: false, displayed: true)
+        asynchttpDelete('onOffCall', postParams, [dataitem1: "datavalue1"])
+        }
+
+
+}
+
+
+
+
+
+
+def setLevel0(value) {
+	def level0 = Math.max(Math.min(value as Integer, 100), 0)
+    def level1 = Math.max(Math.min(state.Slot1_Speed as Integer, 100), 0)
+    def level2 = Math.max(Math.min(state.Slot2_Speed as Integer, 100), 0)
+    def level3 = Math.max(Math.min(state.Slot3_Speed as Integer, 100), 0)
+    def key =(device_key as Integer)
+	sendEvent(name: "Slot0_Speed", value: level0, unit: "%", descriptionText: none)
+    state.Slot0_Speed = level0
+    def postParams = [
+            uri: "https://rest.moodo.co/api/boxes",
+		    requestContentType: 'application/json',
+		    contentType: 'application/json',
+			headers: ["token": "${token}"],
+            body: ["device_key": key, "box_status": 1,"duration_seconds": 0,"settings_slot0":["fan_speed":level0,"fan_active": true],"settings_slot1": ["fan_speed": level1,"fan_active": true],"settings_slot2": ["fan_speed": level2,"fan_active": true],"settings_slot3": ["fan_speed": level3,"fan_active": true],"restful_request_id": "string"]
+                    ]
+	asynchttpPut('onOffCall', postParams)
+}
+def setLevel1(value) {
+	def level0 = Math.max(Math.min(state.Slot0_Speed as Integer, 100), 0)
+    def level1 = Math.max(Math.min(value as Integer, 100), 0)
+    def level2 = Math.max(Math.min(state.Slot2_Speed as Integer, 100), 0)
+    def level3 = Math.max(Math.min(state.Slot3_Speed as Integer, 100), 0)
+    def key =(device_key as Integer)
+	sendEvent(name: "Slot1_Speed", value: level1, unit: "%")
+    state.Slot1_Speed = level1
+    def postParams = [
+            uri: "https://rest.moodo.co/api/boxes",
+		    requestContentType: 'application/json',
+		    contentType: 'application/json',
+			headers: ["token": "${token}"],
+            body: ["device_key": key, "box_status": 1,"duration_seconds": 0,"settings_slot0":["fan_speed":level0,"fan_active": true],"settings_slot1": ["fan_speed": level1,"fan_active": true],"settings_slot2": ["fan_speed": level2,"fan_active": true],"settings_slot3": ["fan_speed": level3,"fan_active": true],"restful_request_id": "string"]
+                    ]
+	asynchttpPut('onOffCall', postParams)
+}
+def setLevel2(value) {
+	def level0 = Math.max(Math.min(state.Slot0_Speed as Integer, 100), 0)
+    def level1 = Math.max(Math.min(state.Slot1_Speed  as Integer, 100), 0)
+	def level2 = Math.max(Math.min(value as Integer, 100), 0)
+    def level3 = Math.max(Math.min(state.Slot3_Speed  as Integer, 100), 0)
+    def key =(device_key as Integer)
+    sendEvent(name: "Slot2_Speed", value: level2, unit: "%")
+    state.Slot2_Speed = level2
+    def postParams = [
+            uri: "https://rest.moodo.co/api/boxes",
+		    requestContentType: 'application/json',
+		    contentType: 'application/json',
+			headers: ["token": "${token}"],
+            body: ["device_key": key, "box_status": 1,"duration_seconds": 0,"settings_slot0":["fan_speed":level0,"fan_active": true],"settings_slot1": ["fan_speed": level1,"fan_active": true],"settings_slot2": ["fan_speed": level2,"fan_active": true],"settings_slot3": ["fan_speed": level3,"fan_active": true],"restful_request_id": "string"]
+                    ]
+	asynchttpPut('onOffCall', postParams)
+}
+def setLevel3(value) {
+	def level0 = Math.max(Math.min(state.Slot0_Speed as Integer, 100), 0)
+    def level1 = Math.max(Math.min(state.Slot1_Speed  as Integer, 100), 0)
+    def level2 = Math.max(Math.min(state.Slot2_Speed as Integer, 100), 0)
+    def level3 = Math.max(Math.min(value as Integer, 100), 0)
+    def key =(device_key as Integer)
+    sendEvent(name: "Slot3_Speed", value: level3, unit: "%")
+    state.Slot3_Speed = level3 
+    def postParams = [
+            uri: "https://rest.moodo.co/api/boxes",
+		    requestContentType: 'application/json',
+		    contentType: 'application/json',
+			headers: ["token": "${token}"],
+            body: ["device_key": key, "box_status": 1,"duration_seconds": 0,"settings_slot0":["fan_speed":level0,"fan_active": true],"settings_slot1": ["fan_speed": level1,"fan_active": true],"settings_slot2": ["fan_speed": level2,"fan_active": true],"settings_slot3": ["fan_speed": level3,"fan_active": true],"restful_request_id": "string"]
+                    ]
+	asynchttpPut('onOffCall', postParams)
+}
+//calls DONE
+def levelCall(response, data) {
+    log.info "$device is at ${response.json.box.fan_volume}%"
+    def levelValue = "${response.json.box.fan_volume}"
+         sendEvent(name: "level", value: levelValue)
+         sendEvent(name:"switch", value: "on", displayed: true)
+}
+def initialSignIn(response, data) {
+     if(response.status == 200)
+        {
+          jsonMap = response.data
+            if (response.data) {
+  
+               state.accessToken = response.json.token
+
+            }
+        }
+
+    log.info "$device ${state.accessToken}"
+
+}
+def onOffCall(response, data) {
+
+ log.debug "${response.data}"
+ 
+ log.info "${response.json.box.settings.getAt(0).capsule_info.title}"  
+    
     def intervalValue = "${response.json.box.interval == true ? "On" : "Off"}"
            sendEvent(name: "Interval", value: intervalValue)
     def shuffleValue = "${response.json.box.shuffle == true ? "On" : "Off"}"
@@ -94,33 +259,37 @@ def myCallbackMethod(response, data) {
     def powerValue = "${response.json.box.box_status == 1 ? "On" : "Off"}"
            sendEvent(name: "Switch", value: powerValue)
     def levelValue = "${response.json.box.fan_volume}"
-           sendEvent(name: "Level", value: levelValue)
+           sendEvent(name: "level", value: levelValue, unit: "%")
     def onlineValue = "${response.json.box.is_online}"
            sendEvent(name: "Online", value: onlineValue)
     
     def slot0Speed = "${response.json.box.settings.getAt(0).fan_speed}"
-           sendEvent(name: "Slot0_Speed", value: slot0Speed)
+           sendEvent(name: "Slot0_Speed", value: slot0Speed, unit: "%", descriptionText: "${response.json.box.settings.getAt(0).capsule_info.title} is at slot0speed")
+           state.Slot0_Speed = slot0Speed
     def slot0Name = "${response.json.box.settings.getAt(0).capsule_info.title}"
            sendEvent(name: "Slot0_Scent", value: slot0Name)
     def slot0Color = "${response.json.box.settings.getAt(0).capsule_info.color}"
            sendEvent(name: "Slot0_Color", value: slot0Color)
     
     def slot1Speed = "${response.json.box.settings.getAt(1).fan_speed}"
-           sendEvent(name: "Slot1_Speed", value: slot1Speed)
+           sendEvent(name: "Slot1_Speed", value: slot1Speed, unit: "%")
+           state.Slot1_Speed = slot1Speed
     def slot1Name = "${response.json.box.settings.getAt(1).capsule_info.title}"
            sendEvent(name: "Slot1_Scent", value: slot1Name)
     def slot1Color = "${response.json.box.settings.getAt(2).capsule_info.color}"
            sendEvent(name: "Slot1_Color", value: slot1Color)
     
     def slot2Speed = "${response.json.box.settings.getAt(2).fan_speed}"
-           sendEvent(name: "Slot2_Speed", value: slot2Speed)
+           sendEvent(name: "Slot2_Speed", value: slot2Speed, unit: "%")
+           state.Slot2_Speed = slot2Speed
     def slot2Name = "${response.json.box.settings.getAt(2).capsule_info.title}"
            sendEvent(name: "Slot2_Scent", value: slot2Name)
     def slot2Color = "${response.json.box.settings.getAt(2).capsule_info.color}"
            sendEvent(name: "Slot2_Color", value: slot2Color)
     
     def slot3Speed = "${response.json.box.settings.getAt(3).fan_speed}"
-       sendEvent(name: "Slot3_Speed", value: slot3Speed)
+       sendEvent(name: "Slot3_Speed", value: slot3Speed, unit: "%")
+       state.Slot3_Speed = slot3Speed
     def slot3Name = "${response.json.box.settings.getAt(3).capsule_info.title}"
        sendEvent(name: "Slot3_Scent", value: slot3Name)
     def slot3Color = "${response.json.box.settings.getAt(3).capsule_info.color}"
@@ -128,105 +297,89 @@ def myCallbackMethod(response, data) {
 
 
 }
-}
 
+//void commands DONE
+def signIn(){
 
-def offDelete(response, data) {
-    if(data["dataitem1"] == "datavalue1")
-        log.debug "status of post call is: ${response.status}"
-
-}
-
-
-
-
-
-
-
-
-def off() {
- def postParams = [
-     uri: "https://rest.moodo.co/api/boxes/${device_key}",
+     def postParams = [
+     uri: "https://rest.moodo.co/api/login",
 		    requestContentType: 'application/json',
 		    contentType: 'application/json',
-			headers: ['token': "${token}"]
+            body: ["email": "${username}","password": "${password}"]
+         
 			]
-     sendEvent(name:"Switch", value: off, displayed: true)
 
-     log.debug"$device Turned Off"
-	 asynchttpDelete('myCallbackMethod', postParams, [dataitem1: "datavalue1"])
+	asynchttpPost('initialSignIn', postParams, [dataitem1: "datavalue1"])
 
+}
+
+
+
+//physical commands DONE
+
+def off() {
+    def postParams = [
+        uri: "https://rest.moodo.co/api/boxes/${device_key}",
+		    requestContentType: 'application/json',
+		    contentType: 'application/json',			
+            headers: ['token': "${token}"]
+
+			]
+     sendEvent(name:"Switch", value: "Off", displayed: true)
+
+    log.info "$device Turned Off"
+    asynchttpDelete('onOffCall', postParams, [dataitem1: "datavalue1"])
+    
 }
 
 
 
 def on() {
- def postParams = [
-     uri: "https://rest.moodo.co/api/boxes/${device_key}",
+    def postParams = [
+        uri: "https://rest.moodo.co/api/boxes/${device_key}",
 		    requestContentType: 'application/json',
 		    contentType: 'application/json',
 			headers: ['token': "${token}"]
 			]
-     sendEvent(name:"Switch", value: on, displayed: true)
-     log.debug"$device Turned On"
-	 asynchttpPost('myCallbackMethod', postParams, [dataitem1: "datavalue1"])
+     sendEvent(name:"Switch", value: "On", displayed: true)
+     log.debug "$device Turned On"
+	 asynchttpPost('onOffCall', postParams, [dataitem1: "datavalue1"])
+
 }
-
-
-
 def intervalOn() {
- def postParams = [
-     uri: "https://rest.moodo.co/api/interval/${device_key}",
+    def postParams = [
+         uri: "https://rest.moodo.co/api/interval/${device_key}",
 		    requestContentType: 'application/json',
 		    contentType: 'application/json',
 			headers: ['token': "${token}"]
 			]
      sendEvent(name:"Interval", value: "On", displayed: true)
-     log.debug"$device Interval is On"
-	 asynchttpPost('myCallbackMethod', postParams, [dataitem1: "datavalue1"])
+     log.info "$device Interval is On"
+	 asynchttpPost('onOffCall', postParams, [dataitem1: "datavalue1"])
 }
 
-def intervalOff() {
- def postParams = [
-     uri: "https://rest.moodo.co/api/interval/${device_key}",
+def intervalOff() { 
+    def postParams = [
+        uri: "https://rest.moodo.co/api/interval/${device_key}",
 		    requestContentType: 'application/json',
 		    contentType: 'application/json',
 			headers: ['token': "${token}"]
 			]
      sendEvent(name:"Interval", value: "Off", displayed: true)
-     log.debug"$device Interval is Off"
-	 asynchttpDelete('myCallbackMethod', postParams, [dataitem1: "datavalue1"])
-}
-
-def shuffle() {
-    if (shuffle.equals("Off")) {
-        shuffleOn()
-        sendEvent(name:"shuffle", value: true, displayed: true)
-        asynchttpPost('myCallbackMethod', postParams, [dataitem1: "datavalue1"])
-        }
-    if (shuffle.equals("On")) {
-        shuffleOff()
-        sendEvent(name:"shuffle", value: false, displayed: true)
-        asynchttpDelete('myCallbackMethod', postParams, [dataitem1: "datavalue1"])
-        }
-    if (shuffle.equals("null")) {
-        shuffleOff()
-        sendEvent(name:"shuffle", value: false, displayed: true)
-        asynchttpDelete('myCallbackMethod', postParams, [dataitem1: "datavalue1"])
-        }
 
 
+     log.info "$device Interval is Off"
+	 asynchttpDelete('onOffCall', postParams, [dataitem1: "datavalue1"])
 }
 def setLevel(value) {
-
-	def level = Math.max(Math.min(value as Integer, 99), 0)
+	def level = Math.max(Math.min(value as Integer, 100), 0)
     if (level > 0) {
-		sendEvent(name: "switch", value: "on")
+		sendEvent(name: "Switch", value: "On")
 	} 
     else {
-		sendEvent(name: "switch", value: "off")
+		sendEvent(name: "Switch", value: "Off")
 	}
-	sendEvent(name: "Fan Speed", value: level, unit: "%")
+	sendEvent(name: "level", value: level, unit: "%")
 
     def postParams = [
             uri: "https://rest.moodo.co/api/intensity/${device_key}",
@@ -240,116 +393,7 @@ def setLevel(value) {
              ],
 			        ]
 
-	asynchttpPost('myCallbackMethod', postParams, [dataitem1: "datavalue1"])
-}
-def setLevel0(value) {
-
-	def level0 = Math.max(Math.min(value as Integer, 99), 0)
-
-	sendEvent(name: "Slot 0 Speed", value: level0, unit: "%")
-
-    def postParams = [
-            uri: "https://rest.moodo.co/api/boxes",
-		    requestContentType: 'application/json',
-		    contentType: 'application/json',
-			headers: ['token': "${token}"],
-            body: [
-               "device_key": "${device_key}",
-                  "settings_slot0": [
-                        "fan_speed": level0,
-                        "fan_active": true
-                      ],
-                      "restful_request_id": "string"
-                    
-                 ],
-			        ]
-
-	asynchttpPut('myCallbackMethod', postParams, [dataitem1: "datavalue1"])
-}
-def setLevel1(value) {
-
-	def level1 = Math.max(Math.min(value as Integer, 99), 0)
-
-	sendEvent(name: "Slot 1 Speed", value: level1, unit: "%")
-
-    def postParams = [
-            uri: "https://rest.moodo.co/api/boxes",
-		    requestContentType: 'application/json',
-		    contentType: 'application/json',
-			headers: ['token': "${token}"],
-            body: [
-               "device_key": "${device_key}",
-                "box_status": 1,
-                "settings_slot0": [
-                        "fan_speed": level0,
-                        "fan_active": true
-                      ], 
-                "settings_slot1": [
-                        "fan_speed": level1,
-                        "fan_active": true
-                 ],
-                "settings_slot2": [
-                        "fan_speed": level2,
-                        "fan_active": true
-                      ],
-                "settings_slot3": [
-                        "fan_speed": level3,
-                        "fan_active": true
-                      ],
-                      "restful_request_id": "string"
-                    
-                 ],
-			        ]
-
-	asynchttpPut('myCallbackMethod', postParams, [dataitem1: "datavalue1"])
-}
-def setLevel2(value) {
-
-	def level2 = Math.max(Math.min(value as Integer, 99), 0)
-
-	sendEvent(name: "Slot 2 Speed", value: level2, unit: "%")
-
-    def postParams = [
-            uri: "https://rest.moodo.co/api/boxes",
-		    requestContentType: 'application/json',
-		    contentType: 'application/json',
-			headers: ['token': "${token}"],
-            body: [
-               "device_key": "${device_key}",
-                "settings_slot2": [
-                        "fan_speed": level2,
-                        "fan_active": true
-                ],
-                      "restful_request_id": "string"
-                    
-                 ],
-			        ]
-
-	asynchttpPut('myCallbackMethod', postParams, [dataitem1: "datavalue1"])
-}
-def setLevel3(value) {
-
-	def level3 = Math.max(Math.min(value as Integer, 99), 0)
-
-	sendEvent(name: "Slot 3 Speed", value: level3, unit: "%")
-
-    def postParams = [
-            uri: "https://rest.moodo.co/api/boxes",
-		    requestContentType: 'application/json',
-		    contentType: 'application/json',
-			headers: ['token': "${token}"],
-            body: [
-               "device_key": "${device_key}",
-                "settings_slot3": [
-                        "fan_speed": level3,
-                        "fan_active": true
-                ],
-                      "restful_request_id": "string"
-                    
-                 ],
-			        ]
-
-	asynchttpPut('myCallbackMethod', postParams, [dataitem1: "datavalue1"])
+	asynchttpPost('levelCall', postParams, [dataitem1: "datavalue1"])
 }
 def shuffleOn() {
  def postParams = [
@@ -360,7 +404,7 @@ def shuffleOn() {
 			]
      log.debug"${name} Shuffle is On"
      sendEvent(name:"Shuffle", value: "On", displayed: true)
-	 asynchttpPost('myCallbackMethod', postParams, [dataitem1: "datavalue1"])
+	 asynchttpPost('onOffCall', postParams, [dataitem1: "datavalue1"])
 }
 
 def shuffleOff() {
@@ -372,5 +416,6 @@ def shuffleOff() {
 			]
      log.debug"${name} Shuffle is Off"
      sendEvent(name:"Shuffle", value: "Off", displayed: true)
-	 asynchttpDelete('myCallbackMethod', postParams, [dataitem1: "datavalue1"])
+	 asynchttpDelete('onOffCall', postParams, [dataitem1: "datavalue1"])
 }
+
