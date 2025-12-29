@@ -23,7 +23,7 @@ preferences {
 		}
 
 metadata {
-	definition (name: "Moodo Box", namespace: "absolutelyNothing", author: "absolutelyNothing") {
+	definition (name: "Moodo Box", namespace: "absolutelyNothing9", author: "absolutelyNothing") {
         capability "Switch"
         capability "Battery"
         capability "Refresh"
