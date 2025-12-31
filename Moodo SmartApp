@@ -1,0 +1,125 @@
+/**
+ * Moodo Integration Manager
+ * Author: absolutelyNothing9 (Updated by Gemini)
+ * Description: Service Manager with Scent Image Injection and Full HTTP Support
+ */
+
+definition(
+    name: "Moodo Integration Manager",
+    namespace: "absolutelyNothing9",
+    author: "absolutelyNothing9",
+    description: "Service Manager for Moodo Box fragrance machines.",
+    category: "My Apps",
+    iconUrl: "",
+    iconX2Url: ""
+)
+
+preferences {
+    page(name: "mainPage")
+    page(name: "authPage")
+}
+
+def mainPage() {
+    return dynamicPage(name: "mainPage", title: "Moodo Config", install: true, uninstall: true) {
+        section("Credentials") {
+            input "username", "text", title: "Email", required: true
+            input "password", "password", title: "Password", required: true
+        }
+        section {
+            href(name: "authLink", title: "Login & Discover", page: "authPage")
+        }
+    }
+}
+
+def authPage() {
+    login()
+    def devices = discoverDevices()
+    return dynamicPage(name: "authPage", title: "Discovery") {
+        section {
+            if (devices) {
+                devices.each { paragraph "Found Moodo: ${it.name} (${it.device_key})" }
+            } else { paragraph "No devices found." }
+        }
+    }
+}
+
+def login() {
+    def params = [
+        uri: "https://rest.moodo.co/api/login",
+        body: [email: settings.username, password: settings.password]
+    ]
+    httpPostJson(params) { resp -> state.accessToken = resp.data.token }
+}
+
+def discoverDevices() {
+    def params = [
+        uri: "https://rest.moodo.co/api/boxes",
+        headers: ["token": state.accessToken]
+    ]
+    httpGet(params) { resp ->
+        resp.data.boxes.each { box ->
+            def dni = "Moodo-${box.device_key}"
+            if (!getChildDevice(dni)) {
+                addChildDevice("absolutelyNothing9", "Moodo Box", dni, [label: "Moodo: ${box.name}", data: [device_key: box.device_key]])
+            }
+        }
+        return resp.data.boxes
+    }
+}
+
+// --- Bridge Method for Child Driver ---
+def sendMoodoRequest(endpoint, method, body = null) {
+    def params = [
+        uri: "https://rest.moodo.co/api/${endpoint}",
+        headers: ["token": state.accessToken],
+        body: body
+    ]
+    
+    // Updated to include GET support
+    if (method == "POST") asynchttpPost("asyncHandler", params)
+    else if (method == "PUT") asynchttpPut("asyncHandler", params)
+    else if (method == "DELETE") asynchttpDelete("asyncHandler", params)
+    else if (method == "GET") asynchttpGet("asyncHandler", params)
+}
+
+def asyncHandler(resp, data) {
+    if (resp.status == 200 && resp.json?.box) {
+        def box = resp.json.box
+        def scentMap = getScentMap() // Load the user's map
+        
+        // Inject Image URLs into the box data before sending to child
+        box.settings.each { slot ->
+            def scentName = slot?.capsule_info?.title
+            if (scentName) {
+                // If a URL exists in the map, add it. Otherwise use default.
+                slot.capsule_info.image_url = scentMap[scentName] ?: scentMap["default"]
+            }
+        }
+
+        def child = getChildDevice("Moodo-${box.device_key}")
+        if (child) child.parseResponse(box)
+    }
+}
+
+// --- USER CONFIGURATION SECTION ---
+// Add your scent names and URLs here using the format: "Name": "URL",
+def getScentMap() {
+    return [
+        "Precious Spices": "https://i.imgur.com/ssDtsxT.png",
+        "Eucalyptus Nights": "https://i.imgur.com/CFeHA1t.png",
+        "Shaman’s Potion": "https://i.imgur.com/7DIYqL3.png",
+        "Incense Voodoo": "https://i.imgur.com/cmoFqDk.png",
+        "Sweet Sand": "https://i.imgur.com/9M2IVX5.png",
+        "Monoi De Tahiti": "https://i.imgur.com/yt3lD6R.png",
+        "Amber Marine": "https://i.imgur.com/xZ53Qqv.png",
+        "Neroli Citrus": "https://i.imgur.com/M0ODMac.png",
+        "Grandma Vanilla": "https://i.imgur.com/GOQsSxo.png",
+        "Lavender": "https://i.imgur.com/hywpxHb.png",
+        "Divine Rose": "https://i.imgur.com/MkHmoJa.png",
+        "Spice Market": "https://i.imgur.com/o0oo0uS.png",
+        "Lawnscape": "https://i.imgur.com/Fh8KIn4.png",
+
+        
+        "default": "https://example.com/default_scent.jpg" // Fallback image
+    ]
+}
