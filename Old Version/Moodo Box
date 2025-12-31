@@ -23,7 +23,7 @@ preferences {
 		}
 
 metadata {
-	definition (name: "Moodo Box", namespace: "absolutelyNothing9", author: "absolutelyNothing") {
+	definition (name: "Moodo Box", namespace: "absolutelyNothing9", author: "absolutelyNothing9") {
         capability "Switch"
         capability "Battery"
         capability "Refresh"
@@ -224,6 +224,16 @@ def setLevel3(value) {
             body: ["device_key": key, "box_status": 1,"duration_seconds": 0,"settings_slot0":["fan_speed":level0,"fan_active": true],"settings_slot1": ["fan_speed": level1,"fan_active": true],"settings_slot2": ["fan_speed": level2,"fan_active": true],"settings_slot3": ["fan_speed": level3,"fan_active": true],"restful_request_id": "string"]
                     ]
 	asynchttpPut('onOffCall', postParams)
+}
+
+def setShuffle(val) {
+    if (val == "on") shuffleOn()
+    else shuffleOff()
+}
+
+def setInterval(val) {
+    if (val == "on") intervalOn()
+    else intervalOff()
 }
 //calls DONE
 def levelCall(response, data) {
