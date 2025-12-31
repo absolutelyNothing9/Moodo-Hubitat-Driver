@@ -1,0 +1,194 @@
+/**
+ * Moodo Box Device Driver (Child)
+ * Author: absolutelyNothing9
+ * Features: Interval, Shuffle, Smart Slot Control, Air Purifier Mode, Filter Status
+ */
+
+metadata {
+    definition (name: "Moodo Box", namespace: "absolutelyNothing9", author: "absolutelyNothing9") {
+        capability "Switch"
+        capability "Switch Level"
+        capability "Refresh"
+        capability "Actuator"
+
+        // --- COMMANDS ---
+        // Scent Control
+        command "setSlotLevel", [[name:"Slot", type: "ENUM", constraints: ["0","1","2","3"]], [name:"Level", type: "NUMBER"]]
+        command "shuffleOn"
+        command "shuffleOff"
+        command "intervalOn"
+        command "intervalOff"
+        
+        // Mode Control
+        command "setModePurifier"
+        command "setModeDiffuser"
+        command "setPurifierSpeed", [[name:"Speed", type: "NUMBER", description: "0-100"]]
+
+        // --- ATTRIBUTES ---
+        attribute "Online", "string"
+        attribute "Interval", "string"
+        attribute "Shuffle", "string"
+        
+        // New Attributes for Moodo AIR
+        attribute "CurrentMode", "string" // "Diffuser" or "Purifier"
+        attribute "FilterStatus", "number" // Percentage remaining
+        
+        // Slot Attributes
+        attribute "Slot0_Scent", "string"
+        attribute "Slot0_Speed", "number"
+        attribute "Slot0_Color", "string"
+
+        attribute "Slot1_Scent", "string"
+        attribute "Slot1_Speed", "number"
+        attribute "Slot1_Color", "string"
+
+        attribute "Slot2_Scent", "string"
+        attribute "Slot2_Speed", "number"
+        attribute "Slot2_Color", "string"
+
+        attribute "Slot3_Scent", "string"
+        attribute "Slot3_Speed", "number"
+        attribute "Slot3_Color", "string"
+    }
+    preferences {
+        input name: "logEnable", type: "bool", title: "Enable Debug Logging", defaultValue: true
+    }
+}
+
+// --- STANDARD SWITCH COMMANDS ---
+def on() { 
+    // Turns device ON in its last known mode or defaults to Diffuser (1)
+    // To be safe, we just send box_status: 1 without forcing mode change unless necessary
+    // But usually simple ON implies Diffuser for standard boxes. 
+    // For AIR, we just use the simple endpoint.
+    parent.sendMoodoRequest("boxes/${device.getDataValue('device_key')}", "POST", [box_status: 1])
+    sendEvent(name: "switch", value: "on") 
+}
+
+def off() { 
+    parent.sendMoodoRequest("boxes/${device.getDataValue('device_key')}", "DELETE")
+    sendEvent(name: "switch", value: "off") 
+}
+
+def setLevel(val) {
+    // Controls main fan volume (works for both Diffuser and Purifier intensity)
+    parent.sendMoodoRequest("intensity/${device.getDataValue('device_key')}", "POST", [fan_volume: val.toInteger()])
+}
+
+// --- MODE COMMANDS ---
+def setModePurifier() {
+    if (logEnable) log.debug "Switching to Purifier Mode"
+    // Mode 2 = Purifier
+    def body = [
+        mode: 2,
+        box_status: 1
+    ]
+    parent.sendMoodoRequest("boxes/${device.getDataValue('device_key')}", "PUT", body)
+}
+
+def setModeDiffuser() {
+    if (logEnable) log.debug "Switching to Diffuser Mode"
+    // Mode 1 = Diffuser
+    def body = [
+        mode: 1,
+        box_status: 1
+    ]
+    parent.sendMoodoRequest("boxes/${device.getDataValue('device_key')}", "PUT", body)
+}
+
+def setPurifierSpeed(speed) {
+    // Helper to ensure we are in Purifier mode AND setting speed
+    if (logEnable) log.debug "Setting Purifier Speed to ${speed}"
+    def body = [
+        mode: 2,
+        box_status: 1,
+        fan_volume: speed.toInteger()
+    ]
+    parent.sendMoodoRequest("boxes/${device.getDataValue('device_key')}", "PUT", body)
+}
+
+// --- INTERVAL COMMANDS ---
+def intervalOn() {
+    parent.sendMoodoRequest("interval/${device.getDataValue('device_key')}", "POST")
+}
+
+def intervalOff() {
+    parent.sendMoodoRequest("interval/${device.getDataValue('device_key')}", "DELETE")
+}
+
+// --- SHUFFLE COMMANDS ---
+def shuffleOn() { 
+    parent.sendMoodoRequest("shuffle/${device.getDataValue('device_key')}", "POST") 
+}
+
+def shuffleOff() { 
+    parent.sendMoodoRequest("shuffle/${device.getDataValue('device_key')}", "DELETE") 
+}
+
+// --- SMART SLOT CONTROL ---
+def setSlotLevel(slot, level) {
+    // If we are setting a slot level, we MUST be in Diffuser mode (Mode 1).
+    // The device cannot diffuse and purify at the same time.
+    
+    def s0 = (slot == "0") ? level : (device.currentValue("Slot0_Speed") ?: 0)
+    def s1 = (slot == "1") ? level : (device.currentValue("Slot1_Speed") ?: 0)
+    def s2 = (slot == "2") ? level : (device.currentValue("Slot2_Speed") ?: 0)
+    def s3 = (slot == "3") ? level : (device.currentValue("Slot3_Speed") ?: 0)
+
+    def body = [
+        device_key: device.getDataValue("device_key").toInteger(),
+        box_status: 1,
+        mode: 1, // FORCE Diffuser mode
+        settings_slot0: [fan_speed: s0, fan_active: true],
+        settings_slot1: [fan_speed: s1, fan_active: true],
+        settings_slot2: [fan_speed: s2, fan_active: true],
+        settings_slot3: [fan_speed: s3, fan_active: true]
+    ]
+    parent.sendMoodoRequest("boxes", "PUT", body)
+}
+
+def refresh() { 
+    parent.sendMoodoRequest("boxes/${device.getDataValue('device_key')}", "GET") 
+}
+
+// --- PARSING ---
+def parseResponse(box) {
+    if (logEnable) log.debug "Parsing Moodo Response: ${box}"
+
+    // Basic status
+    sendEvent(name: "switch", value: box.box_status == 1 ? "on" : "off")
+    sendEvent(name: "level", value: box.fan_volume)
+    sendEvent(name: "Online", value: box.is_online ? "True" : "False")
+
+    // Mode Parsing (New)
+    // box.mode: 1 = Diffuser, 2 = Purifier
+    def modeName = "Unknown"
+    if (box.mode == 1) modeName = "Diffuser"
+    else if (box.mode == 2) modeName = "Purifier"
+    sendEvent(name: "CurrentMode", value: modeName)
+
+    // Filter Status (New)
+    // Sometimes filter info is in 'filter_status_percentage' or inside a specific capsule slot
+    if (box.filter_status_percentage != null) {
+        sendEvent(name: "FilterStatus", value: box.filter_status_percentage)
+    }
+
+    // Standard Features
+    sendEvent(name: "Interval", value: box.interval ? "on" : "off")
+    sendEvent(name: "Shuffle", value: box.shuffle ? "on" : "off")
+
+    // Slot Parsing
+    if (box.settings) {
+        box.settings.eachWithIndex { slot, i ->
+            sendEvent(name: "Slot${i}_Speed", value: slot.fan_speed)
+            // Safety check for null capsule info (common if slot is empty or has filter)
+            if (slot.capsule_info) {
+                sendEvent(name: "Slot${i}_Scent", value: slot.capsule_info.title)
+                sendEvent(name: "Slot${i}_Color", value: slot.capsule_info.color)
+            } else {
+                sendEvent(name: "Slot${i}_Scent", value: "Empty")
+                sendEvent(name: "Slot${i}_Color", value: "#000000")
+            }
+        }
+    }
+}
